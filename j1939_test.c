@@ -66,7 +66,7 @@ static int jt_parse_cm(struct jt_err_msg *emsg,
 
 			switch(nla->nla_type) {
 				case J1939_NLA_BYTES_ACKED:
-					printf("Acked %u bytes\n", *(__uint32_t*)((char*)nla + NLA_HDRLEN));
+					//printf("Acked %u bytes\n", *(__uint32_t*)((char*)nla + NLA_HDRLEN));
 					break;
 				default:
 					printf("Non sup NLA field\n");
@@ -224,8 +224,11 @@ static enum jt_prev_state jt_extract_serr(struct jt_err_msg *emsg)
 				printf("Got INFO_NONE for session %d\n", serr->ee_data);
 				break;
 			case J1939_EE_INFO_TX_ABORT:
-				printf("Got INFO_TX_ABORT for session %d\n", serr->ee_data);
+				printf("Got INFO_TX_ABORT for sn %d\n", serr->ee_data);
 				res = JT_PREV_SEND_FAIL;
+				break;
+			case J1939_EE_INFO_RX_RTS:
+				printf("Got J1939_EE_INFO_RX_RTS for sn %d\n", serr->ee_data);
 				break;
 			default:
 				printf("Got unknown ee_info %d\n", serr->ee_info);
@@ -297,7 +300,7 @@ void* err_thread(void* args)
 		uint64_t res = jt_read_error_queue(err_args->sock, &err );
 		prev_state = res;
 		res = 1;
-		printf("Allowing next send\n");
+		//printf("Allowing next send\n");
 		write(err_args->efd, &res, sizeof(res));
 	}
 
@@ -338,7 +341,7 @@ int main()
 
 	pthread_create(&err_thread_handle, 0, err_thread, &targs);
 
-	for(int i = 0; i < 100; i++)
+	for(int i = 0; i < 20; i++)
 	{
 		struct timespec start = {};
 		struct timespec end = {};
@@ -353,19 +356,19 @@ int main()
 			read(targs.efd, &lock, sizeof(lock));
 			clock_gettime(CLOCK_REALTIME, &end);
 			diff = diff_timespec(&end, &start);
-			printf("Slept for %ld\n", diff.tv_nsec/1000000);
+			//printf("Slept for %ld\n", diff.tv_nsec/1000000);
 		}
 		else if(prev_state == JT_PREV_SEND_FAIL)
 		{
-			struct timespec sleep = {.tv_sec = 0, .tv_nsec = 500000000};
-			printf("Previous send failed going to wait for 500 ms");
+			struct timespec sleep = {.tv_sec = 1, .tv_nsec = 0};
+			printf("Previous send failed going to wait for 1 s\n");
 			nanosleep(&sleep, NULL);
 		}
 	}
 
-	printf("Press any button\n");
-	getc(stdin);
-
+	printf("Closing socket\n");
+	close(sock);
+	printf("Closed socket\n");
 	targs.running = 0;
 
 	pthread_join(err_thread_handle, NULL);
