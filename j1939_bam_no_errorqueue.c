@@ -11,8 +11,10 @@
 #include <time.h>
 
 #define CAN_DEV "can0"
-// 50 milliseconds
-#define SLEEP_TIME_NS 50000000
+#define NS_IN_MS 1000000
+#define SLEEP_TIME_MS 50
+#define SLEEP_TIME_NS (SLEEP_TIME_MS * NS_IN_MS)
+#define SLEEP_TIME_S 0
 
 int jt_create_sock()
 {

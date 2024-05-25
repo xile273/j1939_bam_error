@@ -18,7 +18,8 @@
 
 #define CAN_DEV "can0"
 #define NS_IN_MS 1000000
-#define SLEEP_TIME_NS (50 * NS_IN_MS)
+#define SLEEP_TIME_MS 50
+#define SLEEP_TIME_NS (SLEEP_TIME_MS * NS_IN_MS)
 #define SLEEP_TIME_S 0
 
 enum jt_prev_state {
@@ -335,7 +336,7 @@ int main()
 		},
     };
 
-	struct timespec sleep_time = {.tv_sec = 0, .tv_nsec = SLEEP_TIME_NS};
+	struct timespec sleep_time = {.tv_sec = SLEEP_TIME_S, .tv_nsec = SLEEP_TIME_NS};
 
 
     if(sock < 0) {
