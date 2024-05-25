@@ -11,7 +11,8 @@
 #include <time.h>
 
 #define CAN_DEV "can0"
-#define SLEEP_TIME_NS 5000000
+// 50 milliseconds
+#define SLEEP_TIME_NS 50000000
 
 int jt_create_sock()
 {
@@ -105,12 +106,15 @@ int main()
 
 	getc(stdin);
 	printf("Sending a couple of messages\n");
-	for(int i = 0; i < 20; i++)
+	for(int i = 0; i < 50; i++)
 	{
-		int res = sendto(sock, data, sizeof(data), 0, (const struct sockaddr *) &saddr, sizeof(saddr));
+		int res;
+
+		printf("Sending sn %d\n", i);
+		res= sendto(sock, data, sizeof(data), 0, (const struct sockaddr *) &saddr, sizeof(saddr));
 		if(res == -1)
 		{
-			printf("%m\n");
+			printf("Got error: %m. continuing...\n");
 		}
 		clock_nanosleep(CLOCK_REALTIME, 0, &sleep_time, NULL);
 	}
@@ -129,4 +133,4 @@ int main()
 
 	printf("Now closing socket....\n");
 	close(sock);
-	}
+}

@@ -16,6 +16,11 @@
 #include <sys/eventfd.h>
 #include <time.h>
 
+#define CAN_DEV "can0"
+#define NS_IN_MS 1000000
+#define SLEEP_TIME_NS (50 * NS_IN_MS)
+#define SLEEP_TIME_S 0
+
 enum jt_prev_state {
 	JT_PREV_SEND_SUCCESS = 1,
 	JT_PREV_SEND_FAIL
@@ -66,7 +71,6 @@ static int jt_parse_cm(struct jt_err_msg *emsg,
 
 			switch(nla->nla_type) {
 				case J1939_NLA_BYTES_ACKED:
-					//printf("Acked %u bytes\n", *(__uint32_t*)((char*)nla + NLA_HDRLEN));
 					break;
 				default:
 					printf("Non sup NLA field\n");
@@ -319,9 +323,7 @@ int main()
 		.sock = sock,
 		.efd = eventfd(0, 0)
 	};
-
 	pthread_t err_thread_handle;
-	
 	u_int8_t data[] = {0x10, 0x3F, 0x46, 0x00, 0x02, 0x22, 0xAB, 0x00, 0x02, 0x03, 0x10, 0xF7, 0xEC, 0x03, 0x6F, 0x00, 0x12,
 						0x7E, 0x4B, 0xF7, 0xF2, 0x7E, 0x1A, 0xF7, 0xE4, 0x7E, 0x1A, 0xF7, 0xEB, 0x7E, 0x1A, 0xF7, 0xE6, 0x7E};
 	const struct sockaddr_can saddr = {
@@ -333,45 +335,61 @@ int main()
 		},
     };
 
+	struct timespec sleep_time = {.tv_sec = 0, .tv_nsec = SLEEP_TIME_NS};
+
+
     if(sock < 0) {
         return -1;
     }
 
     ret = jt_bind_socket(sock, "can0", J1939_NO_NAME, J1939_NO_PGN, 0x27);
+	if(ret < 0) {
+        return -1;
+    }
 
 	pthread_create(&err_thread_handle, 0, err_thread, &targs);
 
-	for(int i = 0; i < 20; i++)
-	{
-		struct timespec start = {};
-		struct timespec end = {};
-		struct timespec diff = {};
-		uint64_t lock;
-		printf("Sending sn %d\n", i);
-		sendto(sock, data, sizeof(data), 0, (const struct sockaddr *) &saddr, sizeof(saddr));
 
-		if(prev_state == JT_PREV_SEND_SUCCESS)
+	printf("Make sure there is no other can device on the bus\n");
+	printf("Press any button to continue\n");
+
+	getc(stdin);
+	printf("Sending a couple of messages\n");
+	for(int i = 0; i < 50; i++)
+	{
+		int res;
+
+		printf("Sending sn %d\n", i);
+		res= sendto(sock, data, sizeof(data), 0, (const struct sockaddr *) &saddr, sizeof(saddr));
+		if(res == -1)
 		{
-			clock_gettime(CLOCK_REALTIME, &start);
-			read(targs.efd, &lock, sizeof(lock));
-			clock_gettime(CLOCK_REALTIME, &end);
-			diff = diff_timespec(&end, &start);
-			//printf("Slept for %ld\n", diff.tv_nsec/1000000);
+			printf("Got error: %m. continuing...\n");
 		}
-		else if(prev_state == JT_PREV_SEND_FAIL)
-		{
-			struct timespec sleep = {.tv_sec = 1, .tv_nsec = 0};
-			printf("Previous send failed going to wait for 1 s\n");
-			nanosleep(&sleep, NULL);
-		}
+		clock_nanosleep(CLOCK_REALTIME, 0, &sleep_time, NULL);
 	}
+
+	printf("Switch on another device on the bus\n");
+	printf("Press any button\n");
+	getc(stdin);
+	printf("Sending a couple of messages\n");
+	for(int i = 0; i < 10; i++)
+	{
+		int res = sendto(sock, data, sizeof(data), 0, (const struct sockaddr *) &saddr, sizeof(saddr));
+		if(res == -1)
+			printf("%m\n");
+		
+		clock_nanosleep(CLOCK_REALTIME, 0, &sleep_time, NULL);
+	}
+
+	close(sock);
 
 	printf("Closing socket\n");
 	close(sock);
 	printf("Closed socket\n");
 	targs.running = 0;
 
-	pthread_join(err_thread_handle, NULL);
+	printf("Waiting a bit to print more error messages\n");
+	sleep(100);
 
 	return 0;
 
